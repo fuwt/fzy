@@ -8,6 +8,7 @@
 #include <sys/select.h>
 #include <signal.h>
 #include <errno.h>
+#include <wchar.h>
 
 #include "tty.h"
 

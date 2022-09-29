@@ -5,27 +5,34 @@
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
+#include <wchar.h>
+#include "pinyin.h"
 
 #include "match.h"
 #include "bonus.h"
+/* #include "pinyin.h" */
+#include <locale.h>
 
 #include "../config.h"
 
-char *strcasechr(const char *s, char c) {
-	const char accept[3] = {c, toupper(c), 0};
-	return strpbrk(s, accept);
+wchar_t *strcasechr(const wchar_t *s, wchar_t c) {
+	const wchar_t accept[3] = {c, toupper(c), 0};
+	return wcspbrk(s, accept);
 }
 
 int has_match(const char *needle, const char *haystack) {
-	while (*needle) {
-		char nch = *needle++;
-
-		if (!(haystack = strcasechr(haystack, nch))) {
-			return 0;
-		}
-		haystack++;
-	}
-	return 1;
+  setlocale(LC_ALL, "zh_CN.UTF-8");
+  int needle_len = mbstowcs(NULL, needle, 0);
+  int haystack_len = mbstowcs(NULL, haystack, 0);
+  wchar_t *wneedle, *whaystack;
+  wneedle = calloc(needle_len + 1, sizeof(*wneedle));
+  whaystack = calloc(haystack_len + 1, sizeof(*whaystack));
+  mbstowcs(wneedle, needle, needle_len + 1);
+  mbstowcs(whaystack, haystack, haystack_len + 1);
+  int ret = pinyinmatchstring(wneedle, whaystack);
+  free(wneedle);
+  free(whaystack);
+	return ret;
 }
 
 #define SWAP(x, y, T) do { T SWAP = x; x = y; y = SWAP; } while (0)
@@ -36,8 +43,8 @@ struct match_struct {
 	int needle_len;
 	int haystack_len;
 
-	char lower_needle[MATCH_MAX_LEN];
-	char lower_haystack[MATCH_MAX_LEN];
+	wchar_t lower_needle[MATCH_MAX_LEN];
+	wchar_t lower_haystack[MATCH_MAX_LEN];
 
 	score_t match_bonus[MATCH_MAX_LEN];
 };
@@ -53,18 +60,21 @@ static void precompute_bonus(const char *haystack, score_t *match_bonus) {
 }
 
 static void setup_match_struct(struct match_struct *match, const char *needle, const char *haystack) {
-	match->needle_len = strlen(needle);
-	match->haystack_len = strlen(haystack);
+  setlocale(LC_ALL, "zh_CN.UTF-8");
+	match->needle_len = mbstowcs(NULL, needle, 0);
+	match->haystack_len = mbstowcs(NULL, haystack, 0);
 
 	if (match->haystack_len > MATCH_MAX_LEN || match->needle_len > match->haystack_len) {
 		return;
 	}
 
-	for (int i = 0; i < match->needle_len; i++)
-		match->lower_needle[i] = tolower(needle[i]);
-
-	for (int i = 0; i < match->haystack_len; i++)
-		match->lower_haystack[i] = tolower(haystack[i]);
+  mbstowcs(match->lower_needle, needle, match->needle_len + 1);
+  mbstowcs(match->lower_haystack, haystack, match->haystack_len + 1);
+	/* for (int i = 0; i < match->needle_len; i++) */
+	/* 	match->lower_needle[i] = tolower(needle[i]); */
+	/*  */
+	/* for (int i = 0; i < match->haystack_len; i++) */
+	/* 	match->lower_haystack[i] = tolower(haystack[i]); */
 
 	precompute_bonus(haystack, match->match_bonus);
 }
@@ -74,15 +84,16 @@ static inline void match_row(const struct match_struct *match, int row, score_t 
 	int m = match->haystack_len;
 	int i = row;
 
-	const char *lower_needle = match->lower_needle;
-	const char *lower_haystack = match->lower_haystack;
+	const wchar_t *lower_needle = match->lower_needle;
+	const wchar_t *lower_haystack = match->lower_haystack;
 	const score_t *match_bonus = match->match_bonus;
 
 	score_t prev_score = SCORE_MIN;
 	score_t gap_score = i == n - 1 ? SCORE_GAP_TRAILING : SCORE_GAP_INNER;
 
 	for (int j = 0; j < m; j++) {
-		if (lower_needle[i] == lower_haystack[j]) {
+		if (pinyinmatch(lower_needle[i], lower_haystack[j])) {
+		/* if (lower_needle[i] == lower_haystack[j]) { */
 			score_t score = SCORE_MIN;
 			if (!i) {
 				score = (j * SCORE_GAP_LEADING) + match_bonus[j];

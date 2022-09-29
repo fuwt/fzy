@@ -57,8 +57,11 @@ static void draw_match(tty_interface_t *state, const char *choice, int selected)
 		tty_setinvert(tty);
 #endif
 
+	int choice_len = mbstowcs(NULL, choice, 0);
+	wchar_t choice_w[MATCH_MAX_LEN];
+	mbstowcs(choice_w, choice, choice_len + 1);
 	tty_setnowrap(tty);
-	for (size_t i = 0, p = 0; choice[i] != '\0'; i++) {
+	for (size_t i = 0, p = 0; choice_w[i] != L'\0'; i++) {
 		if (positions[p] == i) {
 			tty_setfg(tty, TTY_COLOR_HIGHLIGHT);
 			p++;
@@ -68,7 +71,7 @@ static void draw_match(tty_interface_t *state, const char *choice, int selected)
 		if (choice[i] == '\n') {
 			tty_putc(tty, ' ');
 		} else {
-			tty_printf(tty, "%c", choice[i]);
+			tty_printf(tty, "%lc", choice_w[i]);
 		}
 	}
 	tty_setwrap(tty);

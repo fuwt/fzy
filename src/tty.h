@@ -1,3 +1,4 @@
+#include <stddef.h>
 #ifndef TTY_H
 #define TTY_H TTY_H
 
